@@ -6,6 +6,8 @@ import matplotlib.image as mpimg
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 import os
 
+from languages import TRANSLATIONS
+
 # settings
 C_EXECUTABLE = 'main.exe' if os.name == 'nt' else './main'
 MAP_FILENAME = 'Campus_8K.jpg'
@@ -24,7 +26,9 @@ FONT_INFO = ("Consolas", 11)
 class MapApp:
     def __init__(self, root):
         self.root = root
-        self.root.title("İTÜ Kampüs Rota Bulucu")
+        self.current_lang = "TR"
+
+        self.root.title(TRANSLATIONS[self.current_lang]["title"])
         self.root.geometry("1920x850")
 
         self.style = ttk.Style()
@@ -40,22 +44,27 @@ class MapApp:
         control_frame.pack(side=tk.LEFT, fill=tk.Y)
         control_frame.pack_propagate(False) 
 
-        lbl_start = ttk.Label(control_frame, text="Başlangıç Noktası:", font=FONT_LABEL, background="#f0f0f0")
-        lbl_start.pack(pady=(0, 5), anchor="w")
+        lang_frame = tk.Frame(control_frame, bg="#f0f0f0")
+        lang_frame.pack(side=tk.TOP, fill=tk.X, padx=10, pady=10)
+        self.btn_lang = tk.Button(lang_frame, text=TRANSLATIONS[self.current_lang]["toggle_btn"], command=self.toggle_language, font=("Segoe UI", 10, "bold"), bg="white", bd=1)
+        self.btn_lang.pack(side=tk.RIGHT)
+
+        self.lbl_start = ttk.Label(control_frame, text=TRANSLATIONS[self.current_lang]["start"], font=FONT_LABEL, background="#f0f0f0")
+        self.lbl_start.pack(pady=(0, 5), anchor="w")
 
         self.start_combo = ttk.Combobox(control_frame, values=self.sorted_names, state="readonly", font=FONT_COMBO)
         self.start_combo.pack(pady=(0, 20), fill=tk.X)
         self.start_combo.set("Ari_Kapi")
         root.option_add('*TCombobox*Listbox.font', FONT_COMBO)
 
-        lbl_end = ttk.Label(control_frame, text="Varış Noktası:", font=FONT_LABEL, background="#f0f0f0")
-        lbl_end.pack(pady=(0, 5), anchor="w")
+        self.lbl_end = ttk.Label(control_frame, text=TRANSLATIONS[self.current_lang]["end"], font=FONT_LABEL, background="#f0f0f0")
+        self.lbl_end.pack(pady=(0, 5), anchor="w")
 
         self.end_combo = ttk.Combobox(control_frame, values=self.sorted_names, state="readonly", font=FONT_COMBO)
         self.end_combo.pack(pady=(0, 30), fill=tk.X)
         self.end_combo.set("MED")
 
-        self.btn_calc = ttk.Button(control_frame, text="ROTAYI GÖSTER", command=self.run_pathfinding, style="Big.TButton")
+        self.btn_calc = ttk.Button(control_frame, text=TRANSLATIONS[self.current_lang]["calc_btn"], command=self.run_pathfinding, style="Big.TButton")
         self.btn_calc.pack(pady=10, fill=tk.X)
 
         inner_frame = tk.Frame(control_frame, bg="#f0f0f0", padx=20)
@@ -72,7 +81,7 @@ class MapApp:
         
         self.scrollbar.config(command=self.result_text.yview)
 
-        self.insert_text("Rota bekleniyor...")
+        self.insert_text(TRANSLATIONS[self.current_lang]["waiting"])
 
         map_frame = ttk.Frame(root)
         map_frame.pack(side=tk.RIGHT, fill=tk.BOTH, expand=True)
@@ -87,8 +96,9 @@ class MapApp:
 
     def load_nodes(self):
         data = {}
+        t = TRANSLATIONS[self.current_lang]
         if not os.path.exists(NODE_FILENAME):
-            messagebox.showerror("Hata", f"{NODE_FILENAME} bulunamadı!")
+            messagebox.showerror(t["error_title"], f"{NODE_FILENAME} not found!")
             return data 
         with open(NODE_FILENAME, 'r') as f:
             for line in f:
@@ -104,69 +114,71 @@ class MapApp:
         return data
 
     def run_pathfinding(self):
-            start_name = self.start_combo.get()
-            end_name = self.end_combo.get()
+        start_name = self.start_combo.get()
+        end_name = self.end_combo.get()
 
-            if not start_name or not end_name:
-                messagebox.showwarning("Uyarı", "Lütfen iki nokta seçiniz.")
-                return
+        t = TRANSLATIONS[self.current_lang]
 
-            start_id = self.node_names[start_name]
-            end_id = self.node_names[end_name]
+        if not start_name or not end_name:
+            messagebox.showwarning(t["warning_title"], t["warning_msg"])
+            return
 
-            try:
-                executable_path = os.path.join(os.getcwd(), C_EXECUTABLE)
-                subprocess.run([executable_path, str(start_id), str(end_id)], check=True)
+        start_id = self.node_names[start_name]
+        end_id = self.node_names[end_name]
+
+        try:
+            executable_path = os.path.join(os.getcwd(), C_EXECUTABLE)
+            subprocess.run([executable_path, str(start_id), str(end_id)], check=True)
                 
-                self.draw_map(show_path=True)
+            self.draw_map(show_path=True)
                 
-                distance_val = 0
-                if os.path.exists("path_info.txt"):
-                    with open("path_info.txt", "r") as f:
-                        try:
-                            content = f.read().strip()
-                            distance_val = float(content)
-                        except ValueError:
-                            pass
-                estimated_minutes = distance_val * 0.025 
+            distance_val = 0
+            if os.path.exists("path_info.txt"):
+                with open("path_info.txt", "r") as f:
+                    try:
+                        content = f.read().strip()
+                        distance_val = float(content)
+                    except ValueError:
+                        pass
+            estimated_minutes = distance_val * 0.025 
                 
-                path_names = []
-                if os.path.exists(PATH_FILENAME):
-                    with open(PATH_FILENAME, 'r') as f:
-                        lines = f.readlines()
-                        for line in reversed(lines):
-                            parts = line.split()
-                            node_id = int(parts[0])
-                            if node_id in self.nodes:
-                                node_name = self.nodes[node_id][2]
-                                path_names.append(node_name)
-                            else:
-                                path_names.append(f"Kavsak({node_id})")
+            path_names = []
+            if os.path.exists(PATH_FILENAME):
+                with open(PATH_FILENAME, 'r') as f:
+                    lines = f.readlines()
+                    for line in reversed(lines):
+                        parts = line.split()
+                        node_id = int(parts[0])
+                        if node_id in self.nodes:
+                            node_name = self.nodes[node_id][2]
+                            path_names.append(node_name)
+                        else:
+                            path_names.append(f"Kavsak({node_id})")
 
-                vertical_path_str = ""                
-                for i, name in enumerate(path_names):
-                    if i == 0:
-                        vertical_path_str += f"📍 BAŞLANGIÇ: {name}\n"
-                        vertical_path_str += "      ⬇\n"
-                    elif i == len(path_names) - 1:
-                        vertical_path_str += f"🏁 VARIŞ: {name}"
-                    else:
-                        vertical_path_str += f"  • {name}\n"
-                        vertical_path_str += "      ⬇\n"
+            vertical_path_str = ""                
+            for i, name in enumerate(path_names):
+                if i == 0:
+                    vertical_path_str += f"{t['res_start']}: {name}\n"
+                    vertical_path_str += "      ⬇\n"
+                elif i == len(path_names) - 1:
+                    vertical_path_str += f"{t['res_end']}: {name}"
+                else:
+                    vertical_path_str += f"  • {name}\n"
+                    vertical_path_str += "      ⬇\n"
 
-                final_message = f"✅ ROTA HESAPLANDI\n" \
-                                f"──────────────────────────\n" \
-                                f"🚶 Tahmini Süre: {estimated_minutes:.1f} dk\n" \
-                                f"📏 Mesafe: {distance_val:.0f} m\n" \
-                                f"──────────────────────────\n" \
-                                f"{vertical_path_str}"
+            final_message = f"{t['res_title']}\n" \
+                            f"──────────────────────────\n" \
+                            f"{t['res_time']}: {estimated_minutes:.1f} dk\n" \
+                            f"{t['res_dist']}: {distance_val:.0f} m\n" \
+                            f"──────────────────────────\n" \
+                            f"{t['res_route']}:\n{vertical_path_str}"
                             
-                self.insert_text(final_message, color="#004d00")
+            self.insert_text(final_message, color="#004d00")
                 
-            except FileNotFoundError:
-                messagebox.showerror("Hata", f"C programı ({C_EXECUTABLE}) bulunamadı.")
-            except subprocess.CalledProcessError:
-                self.insert_text("❌ HATA: Rota bulunamadı.", color="red")
+        except FileNotFoundError:
+            messagebox.showerror(t["error_title"], t["error_c"].format(C_EXECUTABLE))
+        except subprocess.CalledProcessError:
+            self.insert_text(t["error_path"], color="red")
 
     def draw_map(self, show_path=False):
         self.ax.clear()
@@ -179,7 +191,7 @@ class MapApp:
             self.ax.set_ylim(img_h, 0)
             self.ax.axis('off')
         else:
-            self.ax.text(0.5, 0.5, "Harita Resmi Bulunamadı", ha='center')
+            self.ax.text(0.5, 0.5, "image not found", ha='center')
 
         for nid, (x, y, name) in self.nodes.items():
             if nid < 100: 
@@ -206,12 +218,33 @@ class MapApp:
         self.canvas.draw()
 
     def insert_text(self, message, color="black"):
-        """Metin kutusuna güvenli şekilde yazı yazar."""
         self.result_text.config(state="normal")
         self.result_text.delete("1.0", tk.END)
         self.result_text.insert(tk.END, message)
         self.result_text.config(fg=color)
         self.result_text.config(state="disabled")
+    
+    def toggle_language(self):
+        if self.current_lang == "TR":
+            self.current_lang = "EN"
+        else:
+            self.current_lang = "TR"
+            
+        self.update_ui_text()
+        
+    def update_ui_text(self):
+        t = TRANSLATIONS[self.current_lang]
+        
+        self.root.title(t["title"])
+        self.lbl_start.config(text=t["start"])
+        self.lbl_end.config(text=t["end"])
+        self.btn_calc.config(text=t["calc_btn"])
+        self.btn_lang.config(text=t["toggle_btn"])
+        self.insert_text(TRANSLATIONS[self.current_lang]["waiting"])
+        
+        current_text = self.result_text.get("1.0", tk.END).strip()
+        if current_text.startswith("Hazır") or current_text.startswith("Ready"):
+             self.insert_text(t["ready"])
 
 def on_closing():
     print("Program closing...")
