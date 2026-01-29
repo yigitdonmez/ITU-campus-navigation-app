@@ -140,7 +140,7 @@ class MapApp:
                         distance_val = float(content)
                     except ValueError:
                         pass
-            estimated_minutes = distance_val * 0.025 
+            estimated_minutes = distance_val * 0.013
                 
             path_names = []
             if os.path.exists(PATH_FILENAME):

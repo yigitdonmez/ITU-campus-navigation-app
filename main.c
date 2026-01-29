@@ -111,7 +111,7 @@ void save_path_info_to_file(Graph* itu_map, int dest_id, const char* filename) {
     if (target != NULL) {
         FILE* finfo = fopen(filename, "w");
         if (finfo) {
-            fprintf(finfo, "%.2f", target->g_score);
+            fprintf(finfo, "%.2f", target->g_score*5.4);
             fclose(finfo);
         }
     }
